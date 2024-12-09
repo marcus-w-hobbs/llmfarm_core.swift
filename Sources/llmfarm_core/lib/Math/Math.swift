@@ -9,7 +9,7 @@ import Accelerate
 import CoreML
 
 class Math {
-    
+        
     // Argmax
     // Returns the index and value of the largest element in the array.
     static func argmax(_ probs: UnsafePointer<Float32>, _ c: Int) -> (Int, Float) {

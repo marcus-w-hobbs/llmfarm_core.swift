@@ -9,17 +9,17 @@ import llmfarm_core_cpp
 
 var aaa = 1
 // var LLaMa_FineTune_obj_ptr:UnsafeMutableRawPointer? = nil
-var LLaMa_FineTune_obj:LLaMa_FineTune? = nil
+var LLaMa_FineTune_obj: LLaMa_FineTune? = nil
 
 public class LLaMa_FineTune: FineTune {
-    
-    public var progressCallback: ((String)  -> ())? = nil
-    public var progressCallbackExport: ((Double)  -> ())? = nil
 
-    public override func finetune(_ progressCallback: ((String)  -> ())?) throws{
+  public var progressCallback: ((String) -> Void)? = nil
+  public var progressCallbackExport: ((Double) -> Void)? = nil
+
+  public override func finetune(_ progressCallback: ((String) -> Void)?) throws {
     //     let checkpoint_in = self.lora_out  + "_i" + String(self.adam_iter) + "_b" + String(self.batch) + "_c" + String(self.ctx) + "-LATEST.tmp"
     //     let checkpoint_out = self.lora_out + "_i" + String(self.adam_iter) + "_b" + String(self.batch) + "_c" + String(self.ctx)  + "-ITERATION.tmp"
-        
+
     //     var args = ["progr_name", "--model-base", self.model_base, "--lora-out", self.lora_out, "--train-data", self.train_data,
     //                 "--threads", String(self.threads), "--adam-iter", String(self.adam_iter), "--batch", String(self.batch), "--ctx", String(self.ctx),
     //                 "--checkpoint-in", checkpoint_in,
@@ -41,7 +41,7 @@ public class LLaMa_FineTune: FineTune {
     //             let result = run_finetune(Int32(args.count), &cargs,
     //                                         { c_str in
     //                 // let LLaMa_FineTune_obj = Unmanaged<LLaMa_FineTune>.fromOpaque(LLaMa_FineTune_obj_ptr!).takeRetainedValue()
-    //                 // LLaMa_FineTune_obj.retain_new_self_ptr()    
+    //                 // LLaMa_FineTune_obj.retain_new_self_ptr()
     //                 if c_str != nil{
     //                     let for_print = String(cString:c_str!)
     //                     LLaMa_FineTune_obj?.tune_log.append(for_print)
@@ -58,9 +58,9 @@ public class LLaMa_FineTune: FineTune {
     //         print(error)
     //         throw error
     //     }
-    }
-    
-    public func export_lora(_ progressCallback: ((Double)  -> ())?) throws{
+  }
+
+  public func export_lora(_ progressCallback: ((Double) -> Void)?) throws {
     //     var args = ["progr_name", "-m", self.model_base, "-o", self.export_model,
     //         "-t", String(self.threads), "-s",self.lora_out, String(self.export_scale)]
     //     do{
@@ -68,7 +68,7 @@ public class LLaMa_FineTune: FineTune {
     //         var cargs = args.map { strdup($0) }
     //         self.progressCallbackExport = progressCallback
     // //        tuneQueue.async{
-    //         self.retain_new_self_ptr()            
+    //         self.retain_new_self_ptr()
     //         try ExceptionCather.catchException {
     //             let result = export_lora_main(Int32(args.count), &cargs,
     //                                         { progress in
@@ -88,13 +88,13 @@ public class LLaMa_FineTune: FineTune {
     //         print(error)
     //         throw error
     //     }
-    }
-    
-    private func retain_new_self_ptr(){
-        // LLaMa_FineTune_obj_ptr = Unmanaged.passRetained(self).toOpaque()
-        LLaMa_FineTune_obj = Unmanaged<LLaMa_FineTune>.fromOpaque(Unmanaged.passRetained(self).toOpaque()).takeRetainedValue()
-    }
-    
+  }
+
+  private func retain_new_self_ptr() {
+    // LLaMa_FineTune_obj_ptr = Unmanaged.passRetained(self).toOpaque()
+    LLaMa_FineTune_obj = Unmanaged<LLaMa_FineTune>.fromOpaque(
+      Unmanaged.passRetained(self).toOpaque()
+    ).takeRetainedValue()
+  }
+
 }
-
-

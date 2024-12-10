@@ -1,13 +1,13 @@
-import Foundation 
+import Foundation
 import llmfarm_core_cpp
 
 // public class GPT2: LLMBase {
-    
+
 //     public var hardware_arch: String=""
 
-//     public override func llm_load_model(path: String = "", 
+//     public override func llm_load_model(path: String = "",
 //                                         contextParams: ModelAndContextParams = .default,
-//                                         params:gpt_context_params) throws -> Bool{        
+//                                         params:gpt_context_params) throws -> Bool{
 //         var context_params = gpt_context_default_params()
 //         context_params.n_ctx = contextParams.context
 //         //        params.n_parts = contextParams.parts
@@ -29,7 +29,7 @@ import llmfarm_core_cpp
 //         if self.hardware_arch=="x86_64"{
 //             n_gpu_layers = 0
 //         }
-     
+
 //         self.context = gpt2_init_from_file(path, context_params,n_gpu_layers)
 //         if self.context == nil {
 //             return false
@@ -37,11 +37,11 @@ import llmfarm_core_cpp
 //         self.contextParams.promptFormat = .None
 //         return true
 //     }
-    
+
 //     deinit {
 //         gpt2_free(context)
 //     }
-    
+
 //     public override func llm_eval(inputBatch: inout [ModelToken]) throws -> Bool{
 //         let res = gpt2_eval(context, inputBatch, Int32(inputBatch.count), nPast, contextParams.n_threads)
 //         if res != 0 {
@@ -49,15 +49,15 @@ import llmfarm_core_cpp
 //         }
 //         return true
 //     }
-    
+
 // }
 
 // public class LLaMa_dadbed9: LLMBase {
 
 //     public var hardware_arch: String=""
-    
-//     public override func llm_load_model(path: String = "", 
-//                                         contextParams: ModelAndContextParams = .default, 
+
+//     public override func llm_load_model(path: String = "",
+//                                         contextParams: ModelAndContextParams = .default,
 //                                         params:gpt_context_params) throws -> Bool{
 //         var params = llama_dadbed9_context_default_params()
 //         params.n_ctx = contextParams.context
@@ -87,19 +87,19 @@ import llmfarm_core_cpp
 //         }
 //         return true
 //     }
-    
+
 //     deinit {
 //         llama_dadbed9_free(context)
 //     }
-    
+
 //     override func llm_get_n_ctx(ctx: OpaquePointer!) -> Int32{
 //         return llama_dadbed9_n_ctx(ctx)
 //     }
-    
+
 //     override func llm_n_vocab(_ ctx: OpaquePointer!) -> Int32{
 //         return llama_dadbed9_n_vocab(ctx)
 //     }
-        
+
 //     override func llm_get_logits(_ ctx: OpaquePointer!) -> UnsafeMutablePointer<Float>?{
 //         return llama_dadbed9_get_logits(ctx);
 //     }
@@ -110,7 +110,7 @@ import llmfarm_core_cpp
 //         }
 //         return true
 //     }
-    
+
 //     public override func llm_token_to_str(outputToken:Int32) -> String? {
 // //        var cStringPtr: UnsafeMutablePointer<CChar>? = nil
 // //        var cStr_len: Int32 = 0;
@@ -123,7 +123,7 @@ import llmfarm_core_cpp
 //         }
 //         return nil
 //     }
-    
+
 //     public override func llm_token_nl() -> ModelToken{
 // //        return llama_dadbed9_token_nl(self.context)
 //         return llama_dadbed9_token_nl()
@@ -133,15 +133,12 @@ import llmfarm_core_cpp
 // //        return llama_dadbed9_token_bos(self.context)
 //         return llama_dadbed9_token_bos()
 //     }
-    
+
 //     public override func llm_token_eos() -> ModelToken{
 // //        return llama_dadbed9_token_eos(self.context)
 //         return llama_dadbed9_token_eos()
 //     }
-    
 
-    
-    
 //     public override func llm_tokenize(_ input: String, add_bos: Bool?, parse_special:Bool?) -> [ModelToken] {
 //         if input.count == 0 {
 //             return []
@@ -153,12 +150,12 @@ import llmfarm_core_cpp
 //             return []
 //         }
 //         embeddings.removeSubrange(Int(n)..<embeddings.count)
-        
+
 //         if self.contextParams.add_eos_token {
 // //            embeddings.append(llama_dadbed9_token_eos(self.context))
 //             embeddings.append(llama_dadbed9_token_eos())
 //         }
-        
+
 //         return embeddings
 //     }
 // }
@@ -172,21 +169,19 @@ import llmfarm_core_cpp
 //         }
 //         return true
 //     }
-    
+
 //     deinit {
 //         gpt_neox_free(context)
 //     }
-    
+
 //     public override func llm_eval(inputBatch: inout [ModelToken]) throws -> Bool{
 //         if gpt_neox_eval(context, inputBatch, Int32(inputBatch.count), nPast, contextParams.n_threads) != 0 {
 //             throw ModelError.failedToEval
 //         }
 //         return true
 //     }
-    
-    
-// }
 
+// }
 
 // public class Replit: LLMBase {
 
@@ -197,47 +192,42 @@ import llmfarm_core_cpp
 //         }
 //         return true
 //     }
-    
+
 //     deinit {
 //         replit_free(context)
 //     }
-    
+
 //     public override func llm_eval(inputBatch: inout [ModelToken]) throws -> Bool{
 //         if replit_eval(context, inputBatch, Int32(inputBatch.count), nPast, contextParams.n_threads) != 0 {
 //             throw ModelError.failedToEval
 //         }
 //         return true
 //     }
-    
-    
 
-    
 //     override func llm_n_vocab(_ ctx: OpaquePointer!) -> Int32{
 //         return replit_n_logits(ctx)
 //     }
-    
+
 //     public override func llm_token_to_str(outputToken:Int32) -> String? {
 //         if let cStr = replit_token_to_str(context, outputToken){
 //             return String(cString: cStr)
 //         }
 //         return nil
 //     }
-    
+
 //     public override func llm_tokenize(_ input: String, add_bos: Bool?, parse_special:Bool?) -> [ModelToken] {
 //         if input.count == 0 {
 //             return []
 //         }
-        
+
 //         var embeddings = Array<ModelToken>(repeating: gpt_token(), count: input.utf8.count)
 //         let n = replit_tokenize(context, input, &embeddings, Int32(input.utf8.count))
 //         assert(n >= 0)
 //         embeddings.removeSubrange(Int(n)..<embeddings.count)
-        
-        
+
 //         return embeddings
 //     }
 // }
-
 
 // public class Starcoder: LLMBase {
 
@@ -249,16 +239,16 @@ import llmfarm_core_cpp
 // //        self.promptFormat = .None
 //         return true
 //     }
-    
+
 //     deinit {
 //         starcoder_free(context)
 //     }
-    
+
 //     public override func llm_eval(inputBatch: inout [ModelToken]) throws -> Bool{
 //         if starcoder_eval(context, inputBatch, Int32(inputBatch.count), nPast, contextParams.n_threads) != 0 {
 //             throw ModelError.failedToEval
 //         }
 //         return true
 //     }
-    
+
 // }

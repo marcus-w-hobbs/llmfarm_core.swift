@@ -33,6 +33,8 @@ public class LLMBase /*: LLMInference*/ {
   // Used to keep old context until it needs to be rotated or purge out for new tokens
   var past: [[ModelToken]] = []  // Will house both queries and responses in order
   //var n_history: Int32 = 0
+    
+    // TODO: CONTEXT WINDOW MANAGEMENT
   public var nPast: Int32 = 0
 
   public init(path: String, contextParams: ModelAndContextParams = .default) throws {
@@ -283,6 +285,7 @@ public class LLMBase /*: LLMInference*/ {
     return nil
   }
 
+    // TODO: CONTEXT WINDOW MANAGEMENT
   public func _eval_system_prompt(system_prompt: String? = nil) throws {
     if system_prompt != nil {
       var system_pormpt_Tokens = try tokenizePrompt(system_prompt ?? "", .None)
@@ -313,6 +316,7 @@ public class LLMBase /*: LLMInference*/ {
     }
   }
 
+    // TODO: CONTEXT WINDOW MANAGEMENT
   public func kv_shift() throws {
     self.nPast = self.nPast / 2
     try ExceptionCather.catchException {
@@ -331,6 +335,7 @@ public class LLMBase /*: LLMInference*/ {
     return true
   }
 
+    // TODO: CONTEXT WINDOW MANAGEMENT
   public func eval_input_tokens_batched(
     inputTokens: inout [ModelToken], callback: ((String, Double) -> Bool)
   ) throws {
@@ -358,6 +363,7 @@ public class LLMBase /*: LLMInference*/ {
     }
   }
 
+    // TODO: CONTEXT WINDOW MANAGEMENT
   public func predict(
     _ input: String, _ callback: ((String, Double) -> Bool), system_prompt: String? = nil,
     img_path: String? = nil

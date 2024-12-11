@@ -146,6 +146,7 @@ public class LLaMa: LLMBase {
     return id
   }
 
+    // TODO: CONTEXT WINDOW MANAGEMENT
   public override func load_state() {
     if self.contextParams.save_load_state && self.contextParams.state_dump_path != ""
       && FileManager.default.fileExists(atPath: self.contextParams.state_dump_path)
@@ -161,6 +162,7 @@ public class LLaMa: LLMBase {
     }
   }
 
+    // TODO: CONTEXT WINDOW MANAGEMENT
   public override func save_state() {
     if self.contextParams.save_load_state && self.contextParams.state_dump_path != ""
       && self.context != nil
@@ -275,6 +277,7 @@ public class LLaMa: LLMBase {
   //     }
   // }
 
+    // TODO: CONTEXT WINDOW MANAGEMENT
   public override func kv_shift() throws {
     let n_discard = self.nPast / 2
     llama_kv_cache_seq_rm(

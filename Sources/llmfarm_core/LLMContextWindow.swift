@@ -7,24 +7,26 @@
 
 import Foundation
 
-class LLMContextWindow {
+public class LLMContextWindow {
   var maxTokens: Int = 2048  // TODO: make this configurable
   var maxResponseTokens: Int = 250  // TODO: make this configurable
   private let llama3CharactersPerToken: Double = 3.5
   private let llama3WordsPerToken: Double = 0.7
+    private let systemPromptPrefixMarker = "[system](<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n"
+    private let systemPromptSuffixMarker = "<|eot_id|>)\n\n\n"
   private let finalAssistantMarker = "<|start_header_id|>assistant<|end_header_id|>\n"
   private let estimatedMinimumTurnSize = 250  // Adjust based on your needs
   private var roundTable: [Persona]
   private var roundTableIndex: Int = 0
   private var currentPersona: Persona
   private var conversation: [Turn] = []
-  private var ragContent: String = ""  // TODO: Add RAG
+  private var ragContent: String = "RAG\nRAG\nRAG"  // TODO: Add RAG
   private var contextWindowDebug: [String] = []
   private enum ContextWindowError: Error {
     case exceededTokenBudget(section: String, available: Int, required: Int)
   }
 
-  init() {
+  public init() {
     // TODO: Generalize
     roundTable = [
       Personas.AncientTextWiseFriend,
@@ -36,21 +38,25 @@ class LLMContextWindow {
 
   // just record the Turn created by the llm output, don't do anything else.
   // **** assumes that the currentPersona that prompted the model is the one responding.
-  func llmResponded(with response: String) {
+  public func llmResponded(with response: String) {
     let turn = Turn(content: response, persona: currentPersona, timestamp: Date())
     conversation.append(turn)
   }
 
   // just record the user's Turn, don't do anything else
   // i.e., don't change the currentPersona
-  func userPrompted(with prompt: String) {
+  public func userPrompted(with prompt: String) {
     let turn = Turn(content: prompt, persona: Personas.User, timestamp: Date())  // do not change currentPersona
     conversation.append(turn)
   }
 
-  func createContextWindowForCurrentTurn() throws -> String {
-    let contextWindowBudget = TokenBudget(
-      remaining: maxTokens - maxResponseTokens - estimateTokens(for: finalAssistantMarker))
+  public func createContextWindowForCurrentTurn() throws -> String {
+      var tokenEstimate = maxTokens
+      tokenEstimate -= maxResponseTokens
+      tokenEstimate -= estimateTokens(for: systemPromptPrefixMarker)
+      tokenEstimate -= estimateTokens(for: systemPromptSuffixMarker)
+      tokenEstimate -= estimateTokens(for: finalAssistantMarker)
+    let contextWindowBudget = TokenBudget(remaining: tokenEstimate)
     var contextWindow = StringBuilder(
       budget: contextWindowBudget,
       createSectionFn: createSection,
@@ -61,15 +67,7 @@ class LLMContextWindow {
     let systemPrompt =
       currentPersona.systemPrompt
       + ". Limit your response to \(Int(llama3WordsPerToken * Double(maxResponseTokens))) words or less."
-
-    try contextWindow.appendSection(
-      "system",
-      """
-      [system]
-      (<|begin_of_text|>
-      \(systemPrompt)
-      """
-    )
+      try contextWindow.append("\(systemPromptPrefixMarker)\(systemPrompt)\(systemPromptSuffixMarker)")
 
     // 2. RAG Content
     if !ragContent.isEmpty {
@@ -77,13 +75,13 @@ class LLMContextWindow {
     }
 
     // 3. Conversation History ---------------------
-      let conversationBudget = TokenBudget(remaining: contextWindowBudget.remaining)
-      var conversationSubwindow = StringBuilder(
-        budget: conversationBudget,
-        createSectionFn: createSection,
-        estimateTokensFn: estimateTokens
-      )
-      
+    let conversationBudget = TokenBudget(remaining: contextWindowBudget.remaining)
+    var conversationSubwindow = StringBuilder(
+      budget: conversationBudget,
+      createSectionFn: createSection,
+      estimateTokensFn: estimateTokens
+    )
+
     // Most recent turn first
     if let lastTurn = conversation.last {
       try conversationSubwindow.appendSection("user", lastTurn.contentAsUserPersona())
@@ -91,19 +89,20 @@ class LLMContextWindow {
 
     // Prepend previous turns
     for turn in conversation.dropLast().reversed() {
-        try conversationSubwindow.appendSection(turn.persona.identifier(), turn.contentAsPersona(), prepend: true)
+      try conversationSubwindow.appendSection(
+        turn.persona.identifier(), turn.contentAsPersona(), prepend: true)
 
       // Break if we can't fit more history
       if conversationBudget.remaining < estimatedMinimumTurnSize {
         break
       }
     }
-      contextWindow.append(conversationSubwindow.toString())
-      
-      // 3. [end] Conversation History ---------------------
+    try contextWindow.append(conversationSubwindow.toString())
+
+    // 3. [end] Conversation History ---------------------
 
     // Final assistant marker
-    contextWindow.append(finalAssistantMarker)
+    try contextWindow.append(finalAssistantMarker)
 
     return contextWindow.toString()
   }
@@ -202,8 +201,9 @@ class LLMContextWindow {
       self.content += section
     }
 
-    // this is dangerous because it doesn't check for token budget
-    mutating func append(_ content: String) {
+    mutating func append(_ content: String) throws {
+      let tokens = estimateTokensFn(content)
+      try budget.consume(tokens)
       self.content += content
     }
 

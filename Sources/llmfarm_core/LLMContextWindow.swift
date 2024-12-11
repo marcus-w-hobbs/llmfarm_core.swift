@@ -23,13 +23,17 @@ class LLMContextWindow {
     }
   }
 
+  // Estimate tokens for Llama3 models
+  let llama3CharactersPerToken: Double = 3.5
+  let llama3WordsPerToken: Double = 0.7
+
   var maxTokens: Int = 2048  // TODO: make this configurable
   // TODO: Need a max prompt tokens argh
   var maxResponseTokens: Int = 250  // TODO: make this configurable
   var promptTemplate: String = ""
   /*
-    "prompt_format" : "[system](<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nYou are an AI<|eot_id|>)\n\n\n<|start_header_id|>user<|end_header_id|>\n\n\n{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
-  */
+     "prompt_format" : "[system](<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nYou are an AI<|eot_id|>)\n\n\n<|start_header_id|>user<|end_header_id|>\n\n\n{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
+     */
 
   private var roundTable: [Persona]
   private var roundTableIndex: Int = 0
@@ -47,7 +51,8 @@ class LLMContextWindow {
     currentPersona = roundTable[roundTableIndex]
   }
 
-  // just record the Turn created by the llm output, don't do anything else
+  // just record the Turn created by the llm output, don't do anything else.
+  // **** assumes that the currentPersona that prompted the model is the one responding.
   func llmResponded(with response: String) {
     let turn = Turn(content: response, persona: currentPersona, timestamp: Date())
     conversation.append(turn)
@@ -69,140 +74,126 @@ class LLMContextWindow {
   //       if you are a member of the roundtable, your response is the "user" prompt
 
   /*
-    "prompt_format" : "[system](<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nYou are an AI<|eot_id|>)\n\n\n<|start_header_id|>user<|end_header_id|>\n\n\n{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
-  */
+     "prompt_format" : "[system](<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nYou are an AI<|eot_id|>)\n\n\n<|start_header_id|>user<|end_header_id|>\n\n\n{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
+     */
 
-  private func createContextWindow() -> String {
-    let tokenBudget = maxTokens - maxResponseTokens
-    var numTokens: Int = 0
+  /* from Claude:
+     <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+     [Your base system prompt defining the roundtable rules and persona behaviors]<|eot_id|>
+
+     <|start_header_id|>user<|end_header_id|>
+
+     [RAG content or context injection]<|eot_id|>
+
+     <|start_header_id|>persona_alice<|end_header_id|>
+
+     [Alice's contribution]<|eot_id|>
+
+     <|start_header_id|>persona_bob<|end_header_id|>
+
+     [Bob's response]<|eot_id|>
+
+     <|start_header_id|>user<|end_header_id|>
+
+     [Current user/persona input]<|eot_id|>
+
+     <|start_header_id|>assistant<|end_header_id|>
+     */
+
+  func createContextWindowForCurrentTurn() -> String {
+    let assistantResponseWordBudget = Int(llama3WordsPerToken * Double(maxResponseTokens))
+    let finalAssistantMarker: String = "<|start_header_id|>assistant<|end_header_id|>\n"
+    let finalAssistantMarkerTokens = estimateTokens(for: finalAssistantMarker)
+    let contextWindowTokenBudget = maxTokens - maxResponseTokens - finalAssistantMarkerTokens
+    var finalNumTokens: Int = 0
+    var finalContextWindow: String = ""
 
     // 1. System Message
+    // system prompt is a combination of the current persona, and additional instructions to facilitate conversations and manage context.
+    let personaPrompt = currentPersona.systemPrompt
+
+    let additionalInstructions = ". Limit your response to \(assistantResponseWordBudget) or less."
+
+    let finalSystemPrompt = personaPrompt + additionalInstructions
     let systemSection = """
       [system]
       (<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-      \n\n\(currentPersona.systemPrompt)<|eot_id|>\n\n\n
+      \n\n\(finalSystemPrompt)<|eot_id|>\n\n\n
       """
-    numTokens += estimateTokens(for: systemSection)
+    let estimatedSystemSectionTokens = estimateTokens(for: systemSection)
+    if estimatedSystemSectionTokens + finalNumTokens >= contextWindowTokenBudget {
+      fatalError("Context window exceeds token budget at system prompt")
+    } else {
+      finalNumTokens += estimatedSystemSectionTokens
+      finalContextWindow += systemSection
+    }
 
     // 2. RAG Content (if any) - Insert as a system message
     var ragSection: String = ""
     if !ragContent.isEmpty {
       for chunk in ragContent {
         let chunkEntry = """
-          <|start_header_id|>retrieved<|end_header_id|>\n\n\(chunk)<|eot_id|>\n\n
+          <|start_header_id|>user<|end_header_id|>\n\n\(chunk)<|eot_id|>\n\n
           """
         let chunkTokens = estimateTokens(for: chunkEntry)
-        if numTokens + chunkTokens > tokenBudget {
+        if finalNumTokens + chunkTokens > contextWindowTokenBudget {
           fatalError("Context window exceeds token budget RAG")
         } else {
+          finalNumTokens += chunkTokens
           ragSection.append(chunkEntry)
         }
       }
-    }
-
-    // 5. Add Assistant marker for the response
-    let assistantMarker = "<|start_header_id|>assistant<|end_header_id|>"
-    let assistantMarkerTokens = estimateTokens(for: assistantMarker)
-    if numTokens + assistantMarkerTokens > tokenBudget {
-      fatalError("Context window exceeds token budget")
+      let estimatedRagSectionTokens = estimateTokens(for: ragSection)
+      if estimatedRagSectionTokens + finalNumTokens >= contextWindowTokenBudget {
+        fatalError("Context window exceeds token budget RAG")
+      } else {
+        finalNumTokens += estimatedRagSectionTokens
+        finalContextWindow += ragSection
+      }
     }
 
     // 3. Conversation History
     // Walk backwards through conversation, starting with current user message
-    var conversationHistory = ""
+
+    // Add most recent turn as current ***user*** message using contentAsUserPersona
     if let (_, lastTurn) = conversation.enumerated().reversed().first {
-      // Add most recent turn as current user message using contentAsUserPersona
-      let currentUserMessage = """
-        <|start_header_id|>user<|end_header_id|>
+      let currentUserMessage =
+        """
+        <|start_header_id|>user<|end_header_id|>\n
         \(lastTurn.contentAsUserPersona())
         <|eot_id|>
         """
-      context += currentUserMessage
-      numTokens += estimateTokens(for: currentUserMessage)
-
-      // Add previous turns using contentAsPersona
-      for (_, turn) in conversation.dropLast().enumerated().reversed() {
-        let turnMessage = """
-          <|start_header_id|>user<|end_header_id|>
-          \(turn.contentAsPersona())
-          <|eot_id|>
-          """
-
-        let assistantMessage = """
-          <|start_header_id|>assistant<|end_header_id|>
-          <|eot_id|>
-          """
-
-        let turnTokens = estimateTokens(for: turnMessage) + estimateTokens(for: assistantMessage)
-        if (numTokens + turnTokens) > tokenBudget {
-          break
-        }
-
-        context = turnMessage + assistantMessage + context
-        numTokens += turnTokens
-      }
-    }
-
-    return context
-  }
-
-  func createContextWindow(
-    systemPrompt: String,
-    ragChunks: [String],
-    history: [(speaker: String, content: String)],
-    userPrompt: String,
-    maxTokens: Int,
-    leaveForAssistant: Int
-  ) -> String {
-    let tokenBudget = maxTokens - maxResponseTokens
-    var numTokens: Int = 0
-    var context: String = ""
-
-    // Step 1: Start with the system prompt
-    let systemSection = """
-      [system]
-      (<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-      \n\n\(systemPrompt)<|eot_id|>)\n\n\n
-      """
-    context += systemSection
-    numTokens += estimateTokens(for: systemSection)
-
-    // Step 2: Add RAG chunks
-    for chunk in ragChunks {
-      let chunkEntry = """
-        <|start_header_id|>retrieved<|end_header_id|>\n\n\(chunk)<|eot_id|>\n\n
-        """
-      context.append(chunkEntry)
-    }
-
-    // Step 3: Add conversation history
-    var tokenCount = estimateTokens(for: context)  // Helper to count tokens
-    for (speaker, content) in history.reversed() {  // Add from latest to oldest
-      let turn = """
-        <|start_header_id|>\(speaker)<|end_header_id|>\n\n\(content)<|eot_id|>\n\n
-        """
-      let turnTokens = estimateTokens(for: turn)
-      if tokenCount + turnTokens + leaveForAssistant <= maxTokens {
-        context.append(turn)
-        tokenCount += turnTokens
+      let currentUserMessageTokens = estimateTokens(for: currentUserMessage)
+      if currentUserMessageTokens + finalNumTokens >= contextWindowTokenBudget {
+        fatalError("Context window exceeds token budget for most recent turn")
       } else {
-        break  // Stop adding history if we exceed the token limit
+        finalNumTokens += currentUserMessageTokens
+        finalContextWindow += currentUserMessage
       }
     }
 
-    // Step 4: Add the user prompt
-    let userTurn = """
-      <|start_header_id|>user<|end_header_id|>\n\n\(userPrompt)<|eot_id|>\n\n
-      """
-    context.append(userTurn)
+    // add the turns within budget
+    for (_, turn) in conversation.dropLast().enumerated().reversed() {
+      let turnMessage = """
+        <|start_header_id|>\(turn.persona.identifier())<|end_header_id|>\n
+        \(turn.contentAsPersona())
+        <|eot_id|>
+        """
+      let turnTokens = estimateTokens(for: turnMessage)
+      if turnTokens + finalNumTokens >= contextWindowTokenBudget {
+        fatalError("Context window exceeds token budget for turn \(turn.persona.identifier())")
+      } else {
+        finalNumTokens += turnTokens
+        finalContextWindow += turnMessage
+      }
+    }
 
-    // Step 5: Add placeholder for assistant
-    let assistantTurn = """
-      <|start_header_id|>assistant<|end_header_id|>\n\n
-      """
-    context.append(assistantTurn)
+    // add the final system turn for inference, already accounted for
+    finalContextWindow += finalAssistantMarker
 
-    return context
+    // we're done!
+    return finalContextWindow
   }
 
   // Handle persona switching
@@ -214,9 +205,30 @@ class LLMContextWindow {
 
   // Token estimation
   private func estimateTokens(for text: String) -> Int {
-    // TODO: Implement efficient token counting, for now char count
-    let tokenCount = text.count
+    // TODO: Implement efficient token counting, for now modified char count
+    // NOTE: using the llama tokenizer is quite involved, and the one used for inference cannot be safely re-used simultaneously.
+    // See LLama: LLMBase: llm_tokenize
 
-    return tokenCount
+    let tokenCount = Double(text.count) / llama3CharactersPerToken
+
+    return Int(tokenCount)
+  }
+
+  private func enforceHeaderNewline(_ text: String) -> String {
+    // Replace any existing multiple newlines after end_header_id with a single newline
+    let multiNewlinePattern = "<\\|end_header_id\\|>\\s+"
+    let intermediate = text.replacingOccurrences(
+      of: multiNewlinePattern,
+      with: "<|end_header_id|>\n",
+      options: .regularExpression
+    )
+
+    // Ensure there is at least one newline after end_header_id
+    let noNewlinePattern = "<\\|end_header_id\\|>(?![\\n])"
+    return intermediate.replacingOccurrences(
+      of: noNewlinePattern,
+      with: "<|end_header_id|>\n",
+      options: .regularExpression
+    )
   }
 }
